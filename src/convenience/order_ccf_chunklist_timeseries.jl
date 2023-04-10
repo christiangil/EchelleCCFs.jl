@@ -26,12 +26,12 @@ function calc_order_ccf_chunklist_timeseries(clt::AbstractChunkListTimeseries,
   #@assert issorted( plan.line_list.λ )
   #nvs = length(calc_ccf_v_grid(plan))
   nvs = calc_length_ccf_v_grid(plan)
-  norders = length(clt.chunk_list[1].data)
+  norders = num_chunks(clt) # length(clt.chunk_list[1].data)
   nobs =  length(clt.chunk_list)
   order_ccfs = zeros(nvs, norders, nobs)
   num_lines = length(plan.line_list.λ)
-  plan_for_chunk = Vector{BasicCCFPlan}(undef,num_chunks(clt))
-  for chid in 1:num_chunks(clt)
+  plan_for_chunk = Vector{BasicCCFPlan}(undef,norders)
+  for chid in 1:norders
       order = clt[1].order[chid]
       if typeof(plan.line_list) <: BasicLineList2D
           start_order_idx = searchsortedfirst(plan.line_list.order,order)
@@ -95,7 +95,17 @@ function calc_order_ccf_chunklist_timeseries(clt::AbstractChunkListTimeseries,
     #  order_ccfs[:,:,i] .= calc_order_ccfs_chunklist(clt.chunk_list[i], plan)
   #end
   Threads.@threads for i in 1:nobs
+      if verbose 
+         @info "Computing CCF: " i nobs (tid=Threads.threadid())
+      end 
       this_Δfwhm = length(Δfwhm) == nobs ? Δfwhm[i] : 0.0
+          max_nan_frac_to_use = 0.75
+          nan_frac_lambda = sum(isnan.(clt.chunk_list[i].data[j].λ)) / length(clt.chunk_list[i].data[j].λ)
+          nan_frac_flux =   sum(isnan.(clt.chunk_list[i].data[j].flux)) / length(clt.chunk_list[i].data[j].flux)
+          nan_frac_var =    sum(isnan.(clt.chunk_list[i].data[j].var)) / length(clt.chunk_list[i].data[j].var)
+          if (nan_frac_lambda > max_nan_frac_to_use) || (nan_frac_flux > max_nan_frac_to_use) || (nan_frac_var > max_nan_frac_to_use)  
+             continue
+          end 
       order_ccfs[:,:,i] .= calc_order_ccfs_chunklist(clt.chunk_list[i], plan_for_chunk, Δfwhm=this_Δfwhm, assume_sorted=true )
   end
 
@@ -123,13 +133,13 @@ function calc_order_ccf_and_var_chunklist_timeseries(clt::AbstractChunkListTimes
   #@assert issorted( plan.line_list.λ )
   #nvs = length(calc_ccf_v_grid(plan))
   nvs = calc_length_ccf_v_grid(plan)
-  norders = length(clt.chunk_list[1].data)
+  norders = num_chunks(clt) # length(clt.chunk_list[1].data)
   nobs =  length(clt.chunk_list)
   order_ccfs = zeros(nvs, norders, nobs)
   order_ccf_vars = zeros(nvs, norders, nobs)
   num_lines = length(plan.line_list.λ)
-  plan_for_chunk = Vector{BasicCCFPlan}(undef,num_chunks(clt))
-  for chid in 1:num_chunks(clt)
+  plan_for_chunk = Vector{BasicCCFPlan}(undef,norders)
+  for chid in 1:norders
       order = clt[1].order[chid]
       if typeof(plan.line_list) <: BasicLineList2D
           start_order_idx = searchsortedfirst(plan.line_list.order,order)
@@ -191,8 +201,18 @@ function calc_order_ccf_and_var_chunklist_timeseries(clt::AbstractChunkListTimes
     #  order_ccfs[:,:,i] .= calc_order_ccfs_chunklist(clt.chunk_list[i], plan)
   #end
   Threads.@threads for i in 1:nobs
+      if verbose 
+         @info "Computing CCF: " i nobs (tid=Threads.threadid())
+      end
       this_Δfwhm = length(Δfwhm) == nobs ? Δfwhm[i] : 0.0
-      for j in 1:num_chunks(clt)
+      max_nan_frac_to_use = 0.75
+      for j in 1:norders
+          nan_frac_lambda = sum(isnan.(clt.chunk_list[i].data[j].λ)) / length(clt.chunk_list[i].data[j].λ)
+          nan_frac_flux =   sum(isnan.(clt.chunk_list[i].data[j].flux)) / length(clt.chunk_list[i].data[j].flux)
+          nan_frac_var =    sum(isnan.(clt.chunk_list[i].data[j].var)) / length(clt.chunk_list[i].data[j].var)
+          if (nan_frac_lambda > max_nan_frac_to_use) || (nan_frac_flux > max_nan_frac_to_use) || (nan_frac_var > max_nan_frac_to_use)  
+             continue
+          end 
           ( ccf_tmp, ccf_var_tmp ) = calc_ccf_and_var_chunk(clt.chunk_list[i][j], plan_for_chunk[j],
                                             ccf_var_scale=ccf_var_scale, Δfwhm=this_Δfwhm, assume_sorted=true )
           order_ccfs[:,j,i] .= ccf_tmp

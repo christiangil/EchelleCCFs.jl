@@ -7,10 +7,10 @@ Created: September 2020
 using QuadGK
 
 """   SuperGaussianCCFMask
-A truncated Gaussian mask with two parameters, it's stdandard deviation and where to truncate it, both as a velocity in m/s.
+A truncated Gaussian mask with two parameters, its standard deviation and where to truncate it, both as a velocity in m/s.
 Mask weights are stored separately in a line list.
 
-TODO: Repalce Gaussian with super-Gaussian
+TODO: Replace Gaussian with super-Gaussian
 Warning:  Not implemented/tested yet.
 """
 struct SuperGaussianCCFMask <: AbstractCCFMaskShape
@@ -64,5 +64,5 @@ function mask_with_increased_fwhm(m::SuperGaussianCCFMask, Δfwhm::Real )
     fwhm_orig = σ * sqrt(8 * log(2)^(1/m.power))
     fwhm_new = sqrt(fwhm_orig^2 + Δfwhm^2)
     σ_new = fwhm_new/sqrt(8 * log(2)^(1/m.power))
-    return SuperGaussianCCFMask(σ_new, m.power, m.half_width_truncation * (σ_new * sqrt(2) / σ_sqrt2) )
+    return SuperGaussianCCFMask(σ_new, m.power, m.half_width_truncation * (σ_new /σ) )
 end

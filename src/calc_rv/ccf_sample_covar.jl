@@ -16,6 +16,7 @@ function calc_ccf_sample_covar( ccfs::A2, ccf_vars::A3; assume_normalized::Bool 
     if verbose   println("median(obs_weights) = ", median(obs_weights), "   extrema(obs_weights) = ", extrema(obs_weights))   end
     ccf_sample_covar = Array{eltype(ccfs),2}(undef, num_vels, num_vels)
     ccf_sample_covar = calc_ccf_sample_covar_helper!(ccf_sample_covar, ccfs_norm, obs_weights, template=ccf_template, assume_normalized=true )
+    ccf_sample_covar = Symmetric(ccf_sample_covar)
     return ccf_sample_covar
 end
 
@@ -55,32 +56,27 @@ function calc_ccf_sample_covar_helper!( covar_out::A2, ccfs::A2, weights::A1; te
 
     ccfs_norm = assume_normalized ? ccfs : calc_normalized_ccfs(ccfs)
     # Weighted version of (ccfs_norm .- template) * (ccfs_norm .- template)'
-    ccf_sample_covar = zeros(num_vels, num_vels)
+    covar_out = zeros(num_vels, num_vels)
     for j in 1:num_vels
         for k in 1:j
             for i in 1:num_obs
                 summand =  weights[i] * (ccfs[j,i]-template[j]) * (ccfs[k,i]-template[k])
-                ccf_sample_covar[k,j] += summand
+                covar_out[k,j] += summand
                 #=  Can skip since wrapping with Symmetric below to improve memory access pattern
                 if j<k
-                    ccf_sample_covar[k,j] += summand
+                    covar_out[k,j] += summand
                 end
                 =#
             end # i
         end # j
     end # k
-    ccf_sample_covar = Symmetric(ccf_sample_covar)
-    if all(weights.==one(eltype(weights)))
-        normalization = 1.0 / (num_vels-1)
-    else
-        sum_w = sum(weights)
-        sum_w2 = sum(weights.^2)
-        n_eff = sum_w^2/sum_w2
-        normalization = 1.0 / (1.0 - sum_w2 )
-        normalization *= n_eff/(n_eff-1)
-    end
-    ccf_sample_covar *= normalization
-    return ccf_sample_covar
+    sum_w = sum(weights)
+    sum_w2 = sum(weights.^2)
+    n_eff = sum_w^2/sum_w2
+    normalization = 1.0 / (1.0 - sum_w2 )
+    normalization *= n_eff/(n_eff-1)
+    covar_out *= normalization
+    return covar_out
 end
 
 

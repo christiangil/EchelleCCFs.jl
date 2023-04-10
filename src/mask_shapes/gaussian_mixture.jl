@@ -13,7 +13,7 @@ and one parameter for the velocity width at which the whole thing is truncated.
 Mask weights are stored separately in a line list.
 TODO: Test before using
 """
-struct GaussianMixtureMixtureCCFMask{NMix::Integer} <: AbstractCCFMaskShape
+struct GaussianMixtureCCFMask{NMix::Integer} <: AbstractCCFMaskShape
     weight::SVector{NMix,Float64}
     σ_sqrt2::SVector{NMix,Float64}
     v_offset::SVector{NMix,Float64}
@@ -24,7 +24,7 @@ struct GaussianMixtureMixtureCCFMask{NMix::Integer} <: AbstractCCFMaskShape
 
     """ GaussianMixtureCCFMask( σ ; half_truncation_width_in_σ=2 ) """
     function GaussianMixtureCCFMask(weight::AbstractVector{Float64}, σ::AbstractVector{Float64}, truncation_Δv::Real; v_offset::AbstractVector{Float64}=zeros(length(weight)) )
-        n = legnth(weight)
+        n = length(weight)
         @assert 1 <= n <= 10   # Arbitrary upper limit
         @assert length(σ) == n
         @assert length(v_offset) == n
@@ -57,17 +57,19 @@ end
 λ_max(m::GaussianMixtureCCFMask,λ::Real) = λ*calc_doppler_factor(m.truncation_Δv)
 
 function cdf(m::GaussianMixtureCCFMask, v_lo::Real,v_hi::Real, i::Integer)
+    @assert 1 <= i <= length(m.weight)
     m.cdf_normalization[i]*( erf((v_hi-v_offset[i])/σ_sqrt2[i]) - erf((-v_lo-v_offset[i])/σ_sqrt2[i]) )
 end
 
 function pdf(m::GaussianMixtureCCFMask, Δv::Real, i::Integer)
+    @assert 1 <= i <= length(m.weight)
     m.normalization[i]*exp(-(Δv-m.v_offset[i]/m.σ_sqrt2[i])^2)
 end
 
 function integrate(m::GaussianMixtureCCFMask, v_lo::Real,v_hi::Real)
     @assert -m.truncation_Δv <= v_lo < v_hi <= m.truncation_Δv
     #quadgk(m, v_lo, v_hi)[1]
-    mapreduce(i->cdf(m,v_lo,v_hi,i),+,1:length(m.weights))
+    mapreduce(i->cdf(m,v_lo,v_hi,i),+,1:length(m.weight))
 end
 
 """ Functor for returning PSF for Δv <= half_width.  """
@@ -75,7 +77,7 @@ function (m::GaussianMixtureCCFMask)(Δv::Real)
     if abs2(Δv) > abs2(m.truncation_Δv)
         return zero(Δv)
     else
-        return mapreduce(i->pdf(m,Δv,i),+,1:length(m.weights))
+        return mapreduce(i->pdf(m,Δv,i),+,1:length(m.weight))
     end
 end
 
